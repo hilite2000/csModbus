@@ -8,6 +8,7 @@
 /Bin/*.config
 /Bin/*.manifest
 /Bin/*.xml
+/DemoApps/Samples/.vs
 /DemoApps/Samples/MasterSimple/bin
 /DemoApps/Samples/MasterSimple/obj
 /DemoApps/Samples/SlaveEvents/bin
@@ -24,3 +25,5 @@
 /ClassLib/csModbusLib/.vs
 /DemoApps/VB.NET/.vs
 /DemoApps/VB.NET/csModSlave/.vs
+
+/.vs
