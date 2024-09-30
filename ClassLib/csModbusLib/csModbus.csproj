@@ -58,10 +58,12 @@
     <Compile Include="lib\Interface\MbRTU.cs" />
     <Compile Include="lib\Interface\MbSerial.cs" />
     <Compile Include="lib\Modbus\MbSlave.cs" />
+    <Compile Include="lib\Modbus\MbSlaveStateMachine.cs" />
     <Compile Include="lib\SlaveDataServer\MbSlaveData.cs" />
     <Compile Include="lib\SlaveDataServer\MbSlaveDataServer.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="lib\SlaveDataServer\MbSlaveEmServer.cs" />
     <Compile Include="lib\SlaveDataServer\MbSlaveStdServer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

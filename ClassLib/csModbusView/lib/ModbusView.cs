@@ -86,6 +86,8 @@ namespace csModbusView
             setBrowsableProperty("DataType", isNotCoil);
             setBrowsableProperty("Endianes", isNotCoil && (TypeSize > 1));
 
+            bool RdWr = (_MbType == ModbusObjectType.HoldingRegister) || (_MbType == ModbusObjectType.Coils);
+            setBrowsableProperty("WrOnly", RdWr);
             setAllPropertyCategory(_MbType.ToString());
         }
 
@@ -163,6 +165,7 @@ namespace csModbusView
                 RefreshView();
             }
         }
+
 
         [System.ComponentModel.Category("csModbus")]
         [System.ComponentModel.Description("Number of consecutive registers / coils for this group")]
@@ -250,6 +253,12 @@ namespace csModbusView
                 RefreshView();
             }
         }
+
+        [System.ComponentModel.Category("csModbus")]
+        [System.ComponentModel.Browsable(true)]
+        [System.ComponentModel.Description("Write Only")]
+        [System.ComponentModel.DefaultValue(false)]
+        public bool WrOnly { get; set; }
 
         public int DataSize
         {
@@ -364,7 +373,7 @@ namespace csModbusView
         private void setAllPropertyCategory(string newCategory)
         {
             string[] propertyList = {
-                "Title", "BaseAddr", "NumItems", "ItemColumns", "ItemNames", "DataType", "Endianes" 
+                "Title", "BaseAddr", "NumItems", "ItemColumns", "ItemNames", "DataType", "Endianes","WrOnly"
             };
 
             foreach (string prop in propertyList) {

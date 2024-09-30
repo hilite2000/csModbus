@@ -16,11 +16,11 @@ namespace csModbusLib
             SetPort(port);
         }
 
-        public override void ReceiveHeader(int timeOut, MbRawData MbData)
+        public override void ReceiveHeader(int timeOut)
         {
             MbData.EndIdx = 0;
-            ReceiveHeaderData(timeOut, MbData);
-            CheckTransactionIdentifier(MbData);
+            ReceiveHeaderData(timeOut);
+            CheckTransactionIdentifier();
         }
     }
 
@@ -28,8 +28,9 @@ namespace csModbusLib
     {
         public MbUDPMaster(string host_name, int port)  : base(host_name, port)  { }
 
-        public override bool Connect()
+        public override bool Connect(MbRawData Data)
         {
+            base.Connect(Data);
             try {
                 if (mUdpClient == null) {
                     mUdpClient = new UdpClient(remote_host, remote_port);
@@ -51,15 +52,15 @@ namespace csModbusLib
             IsConnected = false;
         }
 
-        public override void SendFrame(MbRawData TransmitData, int Length)
+        public override void SendFrame(int Length)
         {
-            FillMBAPHeader(TransmitData, Length);
-            mUdpClient.Send(TransmitData.Data, Length + MBAP_Header_Size);
+            FillMBAPHeader(Length);
+            mUdpClient.Send(MbData.Data, Length + MBAP_Header_Size);
         }
 
-        protected override void ReceiveHeaderData(int timeOut, MbRawData RxData)
+        protected override void ReceiveHeaderData(int timeOut)
         {
-            UdpReceiveHeaderData(timeOut, RxData);
+            UdpReceiveHeaderData(timeOut);
         }
     }
 
@@ -74,8 +75,9 @@ namespace csModbusLib
             tcpc = new TcpClient();
         }
 
-        public override Boolean Connect()
+        public override Boolean Connect(MbRawData Data)
         {
+            base.Connect(Data);
             if (tcpc == null)
                 tcpc = new TcpClient();
             try {
@@ -100,27 +102,27 @@ namespace csModbusLib
             IsConnected = false;
         }
 
-        public override void SendFrame(MbRawData TransmitData, int Length)
+        public override void SendFrame( int Length)
         {
-            FillMBAPHeader(TransmitData, Length);
-            nwStream.Write(TransmitData.Data, 0, Length + MBAP_Header_Size);
+            FillMBAPHeader(Length);
+            nwStream.Write(MbData.Data, 0, Length + MBAP_Header_Size);
         }
 
-        protected override void ReceiveHeaderData(int timeOut, MbRawData RxData)
+        protected override void ReceiveHeaderData(int timeOut)
         {
-            ReadData(ResponseTimeout, RxData, 8);
-            int bytes2read = RxData.CheckEthFrameLength();
+            ReadData(ResponseTimeout, 8);
+            int bytes2read = MbData.CheckEthFrameLength();
             if (bytes2read > 0) {
-                ReadData(50, RxData, bytes2read);
+                ReadData(50, bytes2read);
             }
         }
 
-        protected void ReadData(int timeOut, MbRawData RxData, int length)
+        protected void ReadData(int timeOut, int length)
         {
             try {
                 nwStream.ReadTimeout = timeOut;
-                int readed = nwStream.Read(RxData.Data, RxData.EndIdx, length);
-                RxData.EndIdx += readed;
+                int readed = nwStream.Read(MbData.Data, MbData.EndIdx, length);
+                MbData.EndIdx += readed;
             } catch (IOException ) {
                 throw new ModbusException(csModbusLib.ErrorCodes.RX_TIMEOUT);
             }

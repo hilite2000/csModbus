@@ -7,22 +7,63 @@ namespace csModbusLib
     public class MbSlave : MbBase
     {
         protected MbSlaveDataServer gDataServer = null;
-        private MBSFrame Frame = new MBSFrame();
+        protected MBSFrame Frame = new MBSFrame();
 
         #region Constructors
-        public MbSlave () {	}
+        public MbSlave() { }
 
-        public MbSlave (MbInterface Interface)
+        public MbSlave(MbInterface Interface)
         {
             InitInterface(Interface);
         }
 
-        public MbSlave (MbInterface Interface, MbSlaveDataServer DataServer)
+        public MbSlave(MbInterface Interface, MbSlaveDataServer DataServer)
         {
             InitInterface(Interface);
             gDataServer = DataServer;
         }
         #endregion
+
+        public bool StartListen()
+        {
+            if (gInterface != null) {
+                if (running) {
+                    StopListen();
+                }
+
+                if (gInterface.Connect(Frame.RawData)) {
+                    StartListener();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public bool StartListen(MbSlaveDataServer DataServer)
+        {
+            gDataServer = DataServer;
+            return StartListen();
+        }
+
+        public bool StartListen(MbInterface Interface, MbSlaveDataServer DataServer)
+        {
+            InitInterface(Interface);
+            gDataServer = DataServer;
+            return StartListen();
+        }
+
+        public void StopListen()
+        {
+            running = false;
+            if (gInterface != null) {
+                gInterface.DisConnect();
+            }
+            StopListener();
+
+        }
+
+        virtual protected void StartListener() { }
+        virtual protected void StopListener() { }
 
         public MbSlaveDataServer DataServer
         {
@@ -30,17 +71,19 @@ namespace csModbusLib
             set { gDataServer = value; }
         }
 
-        public void HandleRequestMessages ()
+        public void HandleRequestMessages()
         {
             running = true;
             Debug.Print("Listener started");
             while (running) {
                 try {
                     ReceiveMasterRequestMessage();
-                    DataServices();
-                    SendResponseMessage();
+                    if (DataServices()) {
+                        SendResponseMessage();
+                    }
 
-                } catch (ModbusException ex) {
+                }
+                catch (ModbusException ex) {
                     if (running) {
                         Debug.Print("ModbusException  {0}", ex.ErrorCode);
                         gInterface.DisConnect();
@@ -54,23 +97,25 @@ namespace csModbusLib
 
         protected void ReceiveMasterRequestMessage()
         {
-            gInterface.ReceiveHeader(MbInterface.InfiniteTimeout, Frame.RawData);
+            gInterface.ReceiveHeader(MbInterface.InfiniteTimeout);
             Frame.ReceiveMasterRequest(gInterface);
         }
 
-        private void SendResponseMessage ()
+        protected void SendResponseMessage()
         {
             int MsgLen = Frame.ToMasterResponseMessageLength();
-            gInterface.SendFrame(Frame.RawData, MsgLen);
+            gInterface.SendFrame(MsgLen);
         }
 
-        private void DataServices ()
+        protected bool DataServices()
         {
             MbSlaveDataServer DataServer = gDataServer;
+            bool ID_matched = false;
             while (DataServer != null) {
-                DataServer.DataServices(Frame);
+                ID_matched |= DataServer.DataServices(Frame);
                 DataServer = DataServer.NextDataServer;
             }
+            return ID_matched;
         }
     }
 
@@ -78,47 +123,17 @@ namespace csModbusLib
     {
         private Thread ListenThread = null;
 
-        public MbSlaveServer () {}
-        public MbSlaveServer (MbInterface Interface) : base(Interface) { }
-        public MbSlaveServer (MbInterface Interface, MbSlaveDataServer DataServer) : base(Interface, DataServer) { }
+        public MbSlaveServer() { }
+        public MbSlaveServer(MbInterface Interface) : base(Interface) { }
+        public MbSlaveServer(MbInterface Interface, MbSlaveDataServer DataServer) : base(Interface, DataServer) { }
 
-        public bool StartListen ()
+        override protected void StartListener()
         {
-            if (gInterface != null) {
-                if (running) {
-                    StopListen();
-                }
-
-                if (gInterface.Connect()) {
-                    ListenThread = new Thread(this.HandleRequestMessages);
-                    ListenThread.Start();
-                    return true;
-
-                }
-            }
-            return false;
+            ListenThread = new Thread(this.HandleRequestMessages);
+            ListenThread.Start();
         }
-
-        public bool StartListen (MbSlaveDataServer DataServer)
+        override protected void StopListener()
         {
-            gDataServer = DataServer;
-            return StartListen();
-        }
-
-        public bool StartListen (MbInterface Interface, MbSlaveDataServer DataServer)
-        {
-            InitInterface(Interface);
-            gDataServer = DataServer;
-            return StartListen();
-        }
-
-        public void StopListen ()
-        {
-            running = false;
-            if (gInterface != null) {
-                gInterface.DisConnect();
-            }
-        
             if (ListenThread != null) {
                 while (ListenThread.IsAlive) {
                     Thread.Yield();

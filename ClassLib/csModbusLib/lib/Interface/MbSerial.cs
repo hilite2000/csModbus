@@ -3,20 +3,23 @@ using System.IO.Ports;
 using System.Threading;
 using System.Diagnostics;
 
-namespace csModbusLib {
-
-    public abstract class MbSerial : MbInterface {
-        public enum ModbusSerialType {
+namespace csModbusLib
+{
+    public abstract class MbSerial : MbInterface
+    {
+        public enum ModbusSerialType
+        {
             RTU = 0,
             ASCII = 1
         }
 
-        private int oneByteTime_us;     
 
         protected SerialPort sp = new SerialPort();
-        protected abstract bool StartOfFrameDetected();
-        protected abstract bool Check_EndOfFrame(MbRawData RxData);
+        public abstract bool StartOfFrameDetected();
+        protected abstract bool Check_EndOfFrame();
+        public abstract int EndOffFrameLenthth();
 
+        private int oneByteTime_us;
         public MbSerial()
         {
         }
@@ -40,10 +43,14 @@ namespace csModbusLib {
             sp.StopBits = StopBits;
             sp.Handshake = Handshake;
             sp.RtsEnable = false;
-            oneByteTime_us = GetCharTime();
+            oneByteTime_us = SerialByteTime();
         }
 
-        private int GetCharTime()
+        public SerialPort getSerialPort ()
+        {
+            return sp;
+        }
+        private int SerialByteTime()
         {
             int nbits = 1 + sp.DataBits;
             nbits += sp.Parity == Parity.None ? 0 : 1;
@@ -61,23 +68,25 @@ namespace csModbusLib {
             return (1000000 * nbits) / sp.BaudRate;
         }
 
-        protected virtual int GetTimeOut_ms (int NumBytes)
+        public int GetTimeOut_ms(int serialBytesCnt)
         {
-            int timeOut = (NumBytes * oneByteTime_us) / 1000;
-            return timeOut + 50;    // 
-
+            if (serialBytesCnt == 0)
+                return 0;
+            int timeOut = (serialBytesCnt * oneByteTime_us) / 1000;
+            return timeOut + 50;    // we need more timeout in a Windoww environement
         }
 
-        public override bool Connect()
+        public override bool Connect(MbRawData Data)
         {
-            IsConnected = false;
+            base.Connect(Data);
             try {
                 sp.Open();
                 if (sp.IsOpen) {
                     IsConnected = true;
                     sp.WriteTimeout = 200;
                 }
-            } catch (System.Exception ex) {
+            }
+            catch (System.Exception ex) {
                 Debug.Print(ex.Message);
                 IsConnected = false;
             }
@@ -100,7 +109,7 @@ namespace csModbusLib {
                 if (timeout != MbInterface.InfiniteTimeout) {
                     timeout -= 10;
                     if (timeout <= 0)
-                        throw new ModbusException(csModbusLib.ErrorCodes.TX_TIMEOUT);
+                        throw new ModbusException(csModbusLib.ErrorCodes.RX_TIMEOUT);
                 }
                 if (IsConnected == false) {
                     throw new ModbusException(csModbusLib.ErrorCodes.CONNECTION_CLOSED);
@@ -108,21 +117,22 @@ namespace csModbusLib {
             }
         }
 
-        public override void ReceiveHeader(int timeOut, MbRawData RxData)
+
+        public override void ReceiveHeader(int timeOut)
         {
-            RxData.IniADUoffs();
+            MbData.Clear();
             WaitFrameStart(timeOut);
-            ReceiveBytes(RxData, 2); // Node-ID + Function-Byte
+            ReceiveBytes(2); // Node-ID + Function-Byte
         }
 
-        public override void ReceiveBytes (MbRawData RxData, int count)
+        public override void ReceiveBytes(int count)
         {
-            sp.ReadTimeout= GetTimeOut_ms(count);
-            ReceiveBytes(RxData.Data, RxData.EndIdx, count);
-            RxData.EndIdx += count;
+            sp.ReadTimeout = GetTimeOut_ms(NumOfSerialBytes(count));
+            ReceiveBytes(MbData.Data, MbData.EndIdx, count);
+            MbData.EndIdx += count;
         }
 
-        protected virtual void ReceiveBytes (byte[] RxData, int offset, int count)
+        protected virtual void ReceiveBytes(byte[] RxData, int offset, int count)
         {
             try {
                 int bytesRead;
@@ -131,21 +141,22 @@ namespace csModbusLib {
                     count -= bytesRead;
                     offset += bytesRead;
                 }
-            } catch (SystemException) {
-                throw new ModbusException(csModbusLib.ErrorCodes.TX_TIMEOUT);
+            }
+            catch (SystemException) {
+                throw new ModbusException(csModbusLib.ErrorCodes.RX_TIMEOUT);
             }
         }
 
-        public override void EndOfFrame(MbRawData RxData)
+        public override void EndOfFrame()
         {
-            if (Check_EndOfFrame(RxData) == false) {
-               // If the server receives the request, but detects a communication error (parity, LRC, CRC,  ...),
+            if (Check_EndOfFrame() == false) {
+                // If the server receives the request, but detects a communication error (parity, LRC, CRC,  ...),
                 // no response is returned. The client program will eventually process a timeout condition for the request.
                 throw new ModbusException(csModbusLib.ErrorCodes.WRONG_CRC);
             }
-         }
+        }
 
-        protected void SendData (byte[] Data, int offs, int count)
+        protected void SendData(byte[] Data, int offs, int count)
         {
             try {
                 // DiscardBuffer to resync start of frame
@@ -153,11 +164,16 @@ namespace csModbusLib {
                 sp.DiscardInBuffer();
 
                 sp.Write(Data, offs, count);
-
-            } catch (SystemException ex) {
+            }
+            catch (SystemException ex) {
                 Debug.Print(ex.Message);
                 throw new ModbusException(csModbusLib.ErrorCodes.TX_TIMEOUT);
             }
+        }
+ 
+        public virtual int NumOfSerialBytes(int count)
+        {
+            return count;   // Default (RTU) , ASCI will have double of count
         }
     }
 }
